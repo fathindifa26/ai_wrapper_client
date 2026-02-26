@@ -4,7 +4,7 @@ Basic Usage Examples - AI Wrapper Client
 Contoh dasar menggunakan AI Wrapper API dari aplikasi Anda.
 """
 
-from client_library import AIClient
+from client.ai_wrapper import AIClient
 
 # ============================================================================
 # SETUP: Ganti dengan URL VM Anda
