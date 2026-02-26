@@ -46,3 +46,7 @@ response = client.chat("Apa kabar?", project_url=project_url)
 ## 📝 Troubleshooting
 - Pastikan port `8000` di server tujuan sudah dibuka.
 - Jika muncul error `NOT_LOGGED_IN`, berarti session di server perlu di-refresh oleh admin.
+
+## 🔗 Links
+- **Contoh Penggunaan Lengkap**: [examples/basic_usage.py](examples/basic_usage.py)
+- **Bahasa Lain (Node.js, Java, dll)**: [examples/other_languages.md](examples/other_languages.md)
