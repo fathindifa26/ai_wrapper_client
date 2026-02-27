@@ -88,12 +88,12 @@ class AIClient:
         images: Optional[List[str]] = None
     ) -> ChatResponse:
         """
-        Send chat request to AI with optional base64-encoded images.
+        Send chat request to AI with optional base64-encoded files.
 
         Args:
             prompt: The prompt/question to send
             project_url: Optional project URL. If not provided, uses default from server.
-            images: Optional list of base64-encoded image strings
+            images: Optional list of base64-encoded file strings (images, videos, PDFs, documents, etc.)
 
         Returns:
             ChatResponse object with status and response
@@ -107,11 +107,16 @@ class AIClient:
             ...     print(response.response)
 
         Example (with image):
-            >>> import base64
-            >>> with open("image.png", "rb") as f:
-            ...     img_b64 = base64.b64encode(f.read()).decode()
+            >>> img_b64 = encode_image("photo.jpg")
             >>> response = client.chat("What's in this image?", images=[img_b64])
-            >>> print(response.response)
+
+        Example (with video):
+            >>> vid_b64 = encode_file("demo.mp4")
+            >>> response = client.chat("Summarize this video", images=[vid_b64])
+
+        Example (with PDF):
+            >>> pdf_b64 = encode_file("document.pdf")
+            >>> response = client.chat("Summarize this document", images=[pdf_b64])
         """
         payload = {
             "prompt": prompt,
@@ -193,10 +198,43 @@ class AIClient:
         return response.json()
 
 
-# Helper function to encode images
+# Helper functions to encode files
+def encode_file(file_path: str) -> str:
+    """
+    Helper to read and base64-encode any file (images, videos, PDFs, documents, etc.).
+
+    Args:
+        file_path: Path to file (relative or absolute)
+
+    Returns:
+        Base64-encoded string
+
+    Raises:
+        FileNotFoundError: If file doesn't exist
+
+    Example:
+        >>> # Encode an image
+        >>> img_b64 = encode_file("photo.jpg")
+        >>> response = client.chat("Describe this image", images=[img_b64])
+
+        >>> # Encode a video
+        >>> vid_b64 = encode_file("demo.mp4")
+        >>> response = client.chat("Summarize this video", images=[vid_b64])
+
+        >>> # Encode a PDF
+        >>> pdf_b64 = encode_file("document.pdf")
+        >>> response = client.chat("Summarize this PDF", images=[pdf_b64])
+    """
+    with open(file_path, "rb") as f:
+        return base64.b64encode(f.read()).decode("utf-8")
+
+
 def encode_image(image_path: str) -> str:
     """
     Helper to read and base64-encode an image file.
+
+    Note: This function works for any file type, not just images.
+    Use encode_file() for better clarity when encoding non-image files.
 
     Args:
         image_path: Path to image file (relative or absolute)
@@ -211,8 +249,7 @@ def encode_image(image_path: str) -> str:
         >>> img_b64 = encode_image("photo.jpg")
         >>> response = client.chat("Describe this", images=[img_b64])
     """
-    with open(image_path, "rb") as f:
-        return base64.b64encode(f.read()).decode("utf-8")
+    return encode_file(image_path)
 
 
 # Convenience function for quick usage
@@ -223,13 +260,13 @@ def quick_chat(
     images: Optional[List[str]] = None
 ) -> str:
     """
-    Quick one-liner chat function with optional base64 images.
+    Quick one-liner chat function with optional base64 files (images, videos, PDFs, etc.).
 
     Args:
         prompt: The question/prompt
         base_url: API base URL
         project_url: Optional project URL
-        images: Optional list of base64-encoded image strings
+        images: Optional list of base64-encoded file strings
 
     Returns:
         AI response text or error message
@@ -239,9 +276,12 @@ def quick_chat(
         >>> print(answer)
 
     Example (with image):
-        >>> img_b64 = encode_image("photo.jpg")
+        >>> img_b64 = encode_file("photo.jpg")
         >>> answer = quick_chat("Describe this", images=[img_b64])
-        >>> print(answer)
+
+    Example (with video):
+        >>> vid_b64 = encode_file("demo.mp4")
+        >>> answer = quick_chat("Summarize this video", images=[vid_b64])
     """
     client = AIClient(base_url)
     response = client.chat(prompt, project_url, images=images)
