@@ -21,8 +21,10 @@ USAGE:
 """
 
 import requests
-from typing import Optional, Dict, Any
+import base64
+from typing import Optional, Dict, Any, List
 from dataclasses import dataclass
+from pathlib import Path
 
 
 @dataclass
@@ -32,6 +34,7 @@ class ChatResponse:
     project_id: Optional[str] = None
     response: Optional[str] = None
     error: Optional[str] = None
+    images_uploaded: Optional[int] = None  # Count of images uploaded
 
     @property
     def success(self) -> bool:
@@ -41,7 +44,8 @@ class ChatResponse:
     def __str__(self) -> str:
         """String representation."""
         if self.success:
-            return f"[{self.project_id}] {self.response}"
+            files_str = f" [{self.images_uploaded} image(s) uploaded]" if self.images_uploaded else ""
+            return f"[{self.project_id}]{files_str} {self.response}"
         else:
             return f"[ERROR] {self.error}"
 
@@ -80,14 +84,16 @@ class AIClient:
     def chat(
         self,
         prompt: str,
-        project_url: Optional[str] = None
+        project_url: Optional[str] = None,
+        images: Optional[List[str]] = None
     ) -> ChatResponse:
         """
-        Send chat request to AI.
+        Send chat request to AI with optional base64-encoded images.
 
         Args:
             prompt: The prompt/question to send
             project_url: Optional project URL. If not provided, uses default from server.
+            images: Optional list of base64-encoded image strings
 
         Returns:
             ChatResponse object with status and response
@@ -95,14 +101,23 @@ class AIClient:
         Raises:
             requests.exceptions.RequestException: If request fails
 
-        Example:
+        Example (text-only):
             >>> response = client.chat("Explain quantum computing")
             >>> if response.success:
             ...     print(response.response)
+
+        Example (with image):
+            >>> import base64
+            >>> with open("image.png", "rb") as f:
+            ...     img_b64 = base64.b64encode(f.read()).decode()
+            >>> response = client.chat("What's in this image?", images=[img_b64])
+            >>> print(response.response)
         """
-        payload = {"prompt": prompt}
-        if project_url:
-            payload["project_url"] = project_url
+        payload = {
+            "prompt": prompt,
+            "project_url": project_url,
+            "images": images  # Can be None
+        }
 
         try:
             response = requests.post(
@@ -117,7 +132,8 @@ class AIClient:
                 status=data.get("status", "error"),
                 project_id=data.get("project_id"),
                 response=data.get("response"),
-                error=data.get("error")
+                error=data.get("error"),
+                images_uploaded=data.get("images_uploaded")
             )
 
         except requests.exceptions.Timeout:
@@ -177,25 +193,58 @@ class AIClient:
         return response.json()
 
 
-# Convenience function for quick usage
-def quick_chat(prompt: str, base_url: str = "http://localhost:8000", project_url: Optional[str] = None) -> str:
+# Helper function to encode images
+def encode_image(image_path: str) -> str:
     """
-    Quick one-liner chat function.
+    Helper to read and base64-encode an image file.
+
+    Args:
+        image_path: Path to image file (relative or absolute)
+
+    Returns:
+        Base64-encoded string
+
+    Raises:
+        FileNotFoundError: If image file doesn't exist
+
+    Example:
+        >>> img_b64 = encode_image("photo.jpg")
+        >>> response = client.chat("Describe this", images=[img_b64])
+    """
+    with open(image_path, "rb") as f:
+        return base64.b64encode(f.read()).decode("utf-8")
+
+
+# Convenience function for quick usage
+def quick_chat(
+    prompt: str,
+    base_url: str = "http://localhost:8000",
+    project_url: Optional[str] = None,
+    images: Optional[List[str]] = None
+) -> str:
+    """
+    Quick one-liner chat function with optional base64 images.
 
     Args:
         prompt: The question/prompt
         base_url: API base URL
         project_url: Optional project URL
+        images: Optional list of base64-encoded image strings
 
     Returns:
         AI response text or error message
 
-    Example:
+    Example (text-only):
         >>> answer = quick_chat("What is AI?", base_url="http://vm:8000")
+        >>> print(answer)
+
+    Example (with image):
+        >>> img_b64 = encode_image("photo.jpg")
+        >>> answer = quick_chat("Describe this", images=[img_b64])
         >>> print(answer)
     """
     client = AIClient(base_url)
-    response = client.chat(prompt, project_url)
+    response = client.chat(prompt, project_url, images=images)
     return response.response if response.success else f"Error: {response.error}"
 
 
