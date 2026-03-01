@@ -93,7 +93,7 @@ class AIClient:
         Args:
             prompt: The prompt/question to send
             project_url: Optional project URL. If not provided, uses default from server.
-            images: Optional list of base64-encoded file strings (images, videos, PDFs, documents, etc.)
+            files: Optional list of base64-encoded file strings (images, videos, PDFs, documents, etc.)
 
         Returns:
             ChatResponse object with status and response
@@ -277,11 +277,11 @@ def quick_chat(
 
     Example (with image):
         >>> img_b64 = encode_file("photo.jpg")
-        >>> answer = quick_chat("Describe this", images=[img_b64])
+        >>> answer = quick_chat("Describe this", files=[img_b64])
 
     Example (with video):
         >>> vid_b64 = encode_file("demo.mp4")
-        >>> answer = quick_chat("Summarize this video", images=[vid_b64])
+        >>> answer = quick_chat("Summarize this video", files=[vid_b64])
     """
     client = AIClient(base_url)
     response = client.chat(prompt, project_url, files=files)
