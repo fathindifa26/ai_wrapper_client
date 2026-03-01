@@ -34,7 +34,7 @@ class ChatResponse:
     project_id: Optional[str] = None
     response: Optional[str] = None
     error: Optional[str] = None
-    images_uploaded: Optional[int] = None  # Count of images uploaded
+    files_uploaded: Optional[int] = None  # Count of files uploaded
 
     @property
     def success(self) -> bool:
@@ -44,7 +44,7 @@ class ChatResponse:
     def __str__(self) -> str:
         """String representation."""
         if self.success:
-            files_str = f" [{self.images_uploaded} image(s) uploaded]" if self.images_uploaded else ""
+            files_str = f" [{self.files_uploaded} file(s) uploaded]" if self.files_uploaded else ""
             return f"[{self.project_id}]{files_str} {self.response}"
         else:
             return f"[ERROR] {self.error}"
@@ -85,7 +85,7 @@ class AIClient:
         self,
         prompt: str,
         project_url: Optional[str] = None,
-        images: Optional[List[str]] = None
+        files: Optional[List[str]] = None
     ) -> ChatResponse:
         """
         Send chat request to AI with optional base64-encoded files.
@@ -107,8 +107,8 @@ class AIClient:
             ...     print(response.response)
 
         Example (with image):
-            >>> img_b64 = encode_image("photo.jpg")
-            >>> response = client.chat("What's in this image?", images=[img_b64])
+            >>> img_b64 = encode_file("photo.jpg")
+            >>> response = client.chat("What's in this image?", files=[img_b64])
 
         Example (with video):
             >>> vid_b64 = encode_file("demo.mp4")
@@ -121,7 +121,7 @@ class AIClient:
         payload = {
             "prompt": prompt,
             "project_url": project_url,
-            "images": images  # Can be None
+            "files": files  # Can be None
         }
 
         try:
@@ -138,7 +138,7 @@ class AIClient:
                 project_id=data.get("project_id"),
                 response=data.get("response"),
                 error=data.get("error"),
-                images_uploaded=data.get("images_uploaded")
+                files_uploaded=data.get("files_uploaded")
             )
 
         except requests.exceptions.Timeout:
@@ -215,7 +215,7 @@ def encode_file(file_path: str) -> str:
     Example:
         >>> # Encode an image
         >>> img_b64 = encode_file("photo.jpg")
-        >>> response = client.chat("Describe this image", images=[img_b64])
+        >>> response = client.chat("Describe this image", files=[img_b64])
 
         >>> # Encode a video
         >>> vid_b64 = encode_file("demo.mp4")
@@ -223,7 +223,7 @@ def encode_file(file_path: str) -> str:
 
         >>> # Encode a PDF
         >>> pdf_b64 = encode_file("document.pdf")
-        >>> response = client.chat("Summarize this PDF", images=[pdf_b64])
+        >>> response = client.chat("Summarize this PDF", files=[pdf_b64])
     """
     with open(file_path, "rb") as f:
         return base64.b64encode(f.read()).decode("utf-8")
@@ -247,7 +247,7 @@ def encode_image(image_path: str) -> str:
 
     Example:
         >>> img_b64 = encode_image("photo.jpg")
-        >>> response = client.chat("Describe this", images=[img_b64])
+        >>> response = client.chat("Describe this", files=[img_b64])
     """
     return encode_file(image_path)
 
@@ -257,7 +257,7 @@ def quick_chat(
     prompt: str,
     base_url: str = "http://localhost:8000",
     project_url: Optional[str] = None,
-    images: Optional[List[str]] = None
+    files: Optional[List[str]] = None
 ) -> str:
     """
     Quick one-liner chat function with optional base64 files (images, videos, PDFs, etc.).
@@ -284,7 +284,7 @@ def quick_chat(
         >>> answer = quick_chat("Summarize this video", images=[vid_b64])
     """
     client = AIClient(base_url)
-    response = client.chat(prompt, project_url, images=images)
+    response = client.chat(prompt, project_url, files=files)
     return response.response if response.success else f"Error: {response.error}"
 
 
