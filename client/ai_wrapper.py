@@ -5,10 +5,10 @@ Simple Python client untuk akses AI Wrapper API.
 Mudah digunakan untuk development dan production.
 
 USAGE:
-    from client_library import AIClient
+    from client.ai_wrapper import AIWrapper
 
     # Initialize client
-    client = AIClient(base_url="http://your-vm:8000")
+    client = AIWrapper(base_url="http://your-vm:8000")
 
     # Single project mode (uses default AI_URL from server)
     response = client.chat("What is AI?")
@@ -22,135 +22,103 @@ USAGE:
 
 import requests
 import base64
-from typing import Optional, Dict, Any, List
+import json
+from typing import Optional, Dict, Any, List, Union
 from dataclasses import dataclass
 from pathlib import Path
+
+# Optional LangChain imports
+try:
+    from langchain_core.messages import BaseMessage, AIMessage, HumanMessage
+    from langchain_core.language_models.chat_models import BaseChatModel
+    from langchain_core.outputs import ChatResult, ChatGeneration
+
+    _HAS_LANGCHAIN = True
+except ImportError:
+    _HAS_LANGCHAIN = False
+
+    # Mock classes for type hinting if langchain not installed
+    class BaseChatModel:
+        pass
+
+    class BaseMessage:
+        pass
+
+    class ChatResult:
+        pass
 
 
 @dataclass
 class ChatResponse:
-    """Response from AI chat."""
+    """Response from AI chat following Gemini-style standardization."""
+
     status: str
     project_id: Optional[str] = None
-    response: Optional[str] = None
+    response: Optional[str] = None  # Original text response
+    candidates: Optional[List[Dict[str, Any]]] = None  # Standardized Gemini candidates
     error: Optional[str] = None
-    files_uploaded: Optional[int] = None  # Count of files uploaded
+    files_uploaded: Optional[int] = None
 
     @property
     def success(self) -> bool:
-        """Check if request was successful."""
         return self.status == "success"
 
+    @property
+    def text(self) -> str:
+        """Get the main text response from candidates or response field."""
+        if self.candidates and len(self.candidates) > 0:
+            parts = self.candidates[0].get("content", {}).get("parts", [])
+            for part in parts:
+                if "text" in part:
+                    return part["text"]
+        return self.response or ""
+
     def __str__(self) -> str:
-        """String representation."""
         if self.success:
-            files_str = f" [{self.files_uploaded} file(s) uploaded]" if self.files_uploaded else ""
-            return f"[{self.project_id}]{files_str} {self.response}"
-        else:
-            return f"[ERROR] {self.error}"
+            return f"[{self.project_id}] {self.text}"
+        return f"[ERROR] {self.error}"
 
 
-class AIClient:
+class AIWrapper:
     """
-    Client untuk AI Wrapper API.
+    Base client for AI Wrapper API.
 
     Example:
-        >>> client = AIClient("http://vm-server:8000")
-        >>> response = client.chat("What is Python?")
-        >>> print(response.response)
+        >>> client = AIWrapper("http://localhost:8000")
+        >>> res = client.chat("Hello!")
+        >>> print(res.text)
     """
 
-    def __init__(self, base_url: str, timeout: int = 180):
-        """
-        Initialize AI client.
-
-        Args:
-            base_url: Base URL of AI Wrapper API (e.g., "http://vm:8000")
-            timeout: Request timeout in seconds (default: 180)
-        """
-        self.base_url = base_url.rstrip('/')
+    def __init__(self, base_url: str = "http://localhost:8000", timeout: int = 300):
+        self.base_url = base_url.rstrip("/")
         self.timeout = timeout
-        self._verify_connection()
-
-    def _verify_connection(self) -> None:
-        """Verify connection to API server."""
-        try:
-            response = requests.get(f"{self.base_url}/status", timeout=5)
-            if response.status_code != 200:
-                print(f"Warning: API returned status code {response.status_code}")
-        except requests.exceptions.RequestException as e:
-            print(f"Warning: Could not connect to API: {e}")
 
     def chat(
         self,
         prompt: str,
         project_url: Optional[str] = None,
-        files: Optional[List[str]] = None
+        files: Optional[List[str]] = None,
     ) -> ChatResponse:
-        """
-        Send chat request to AI with optional base64-encoded files.
-
-        Args:
-            prompt: The prompt/question to send
-            project_url: Optional project URL. If not provided, uses default from server.
-            files: Optional list of base64-encoded file strings (images, videos, PDFs, documents, etc.)
-
-        Returns:
-            ChatResponse object with status and response
-
-        Raises:
-            requests.exceptions.RequestException: If request fails
-
-        Example (text-only):
-            >>> response = client.chat("Explain quantum computing")
-            >>> if response.success:
-            ...     print(response.response)
-
-        Example (with image):
-            >>> img_b64 = encode_file("photo.jpg")
-            >>> response = client.chat("What's in this image?", files=[img_b64])
-
-        Example (with video):
-            >>> vid_b64 = encode_file("demo.mp4")
-            >>> response = client.chat("Summarize this video", images=[vid_b64])
-
-        Example (with PDF):
-            >>> pdf_b64 = encode_file("document.pdf")
-            >>> response = client.chat("Summarize this document", images=[pdf_b64])
-        """
-        payload = {
-            "prompt": prompt,
-            "project_url": project_url,
-            "files": files  # Can be None
-        }
+        """Send chat request. Supports multimedia and tool calls via standardized output."""
+        payload = {"prompt": prompt, "project_url": project_url, "files": files}
 
         try:
             response = requests.post(
-                f"{self.base_url}/chat",
-                json=payload,
-                timeout=self.timeout
+                f"{self.base_url}/chat", json=payload, timeout=self.timeout
             )
             response.raise_for_status()
-
             data = response.json()
+
             return ChatResponse(
                 status=data.get("status", "error"),
                 project_id=data.get("project_id"),
                 response=data.get("response"),
+                candidates=data.get("candidates"),
                 error=data.get("error"),
-                files_uploaded=data.get("files_uploaded")
+                files_uploaded=data.get("files_uploaded"),
             )
-
-        except requests.exceptions.Timeout:
-            return ChatResponse(
-                status="error",
-                error="Request timeout - AI taking too long to respond"
-            )
-        except requests.exceptions.RequestException as e:
-            return ChatResponse(
-                status="error",
-                error=f"Request failed: {str(e)}"
-            )
+        except Exception as e:
+            return ChatResponse(status="error", error=str(e))
 
     def get_status(self) -> Dict[str, Any]:
         """
@@ -199,119 +167,56 @@ class AIClient:
 
 
 # Helper functions to encode files
-def encode_file(file_path: str) -> str:
-    """
-    Helper to read and base64-encode any file (images, videos, PDFs, documents, etc.).
-
-    Args:
-        file_path: Path to file (relative or absolute)
-
-    Returns:
-        Base64-encoded string
-
-    Raises:
-        FileNotFoundError: If file doesn't exist
-
-    Example:
-        >>> # Encode an image
-        >>> img_b64 = encode_file("photo.jpg")
-        >>> response = client.chat("Describe this image", files=[img_b64])
-
-        >>> # Encode a video
-        >>> vid_b64 = encode_file("demo.mp4")
-        >>> response = client.chat("Summarize this video", images=[vid_b64])
-
-        >>> # Encode a PDF
-        >>> pdf_b64 = encode_file("document.pdf")
-        >>> response = client.chat("Summarize this PDF", files=[pdf_b64])
-    """
+def encode_file(file_path: Union[str, Path]) -> str:
+    """Base64 encode file for multimedia input."""
     with open(file_path, "rb") as f:
         return base64.b64encode(f.read()).decode("utf-8")
 
 
-def encode_image(image_path: str) -> str:
-    """
-    Helper to read and base64-encode an image file.
-
-    Note: This function works for any file type, not just images.
-    Use encode_file() for better clarity when encoding non-image files.
-
-    Args:
-        image_path: Path to image file (relative or absolute)
-
-    Returns:
-        Base64-encoded string
-
-    Raises:
-        FileNotFoundError: If image file doesn't exist
-
-    Example:
-        >>> img_b64 = encode_image("photo.jpg")
-        >>> response = client.chat("Describe this", files=[img_b64])
-    """
-    return encode_file(image_path)
-
-
 # Convenience function for quick usage
-def quick_chat(
-    prompt: str,
-    base_url: str = "http://localhost:8000",
-    project_url: Optional[str] = None,
-    files: Optional[List[str]] = None
-) -> str:
-    """
-    Quick one-liner chat function with optional base64 files (images, videos, PDFs, etc.).
-
-    Args:
-        prompt: The question/prompt
-        base_url: API base URL
-        project_url: Optional project URL
-        images: Optional list of base64-encoded file strings
-
-    Returns:
-        AI response text or error message
-
-    Example (text-only):
-        >>> answer = quick_chat("What is AI?", base_url="http://vm:8000")
-        >>> print(answer)
-
-    Example (with image):
-        >>> img_b64 = encode_file("photo.jpg")
-        >>> answer = quick_chat("Describe this", files=[img_b64])
-
-    Example (with video):
-        >>> vid_b64 = encode_file("demo.mp4")
-        >>> answer = quick_chat("Summarize this video", files=[vid_b64])
-    """
-    client = AIClient(base_url)
-    response = client.chat(prompt, project_url, files=files)
-    return response.response if response.success else f"Error: {response.error}"
+def quick_chat(prompt: str, base_url: str = "http://localhost:8000", **kwargs) -> str:
+    """Quick one-liner chat."""
+    client = AIWrapper(base_url)
+    return client.chat(prompt, **kwargs).text
 
 
-if __name__ == "__main__":
-    # Demo usage
-    print("AI Wrapper Client Library - Demo\n")
+# --- LangChain Integration ---
+if _HAS_LANGCHAIN:
 
-    # Initialize client (change to your VM URL)
-    client = AIClient("http://localhost:8000")
+    class ChatAIWrapper(BaseChatModel):
+        """Custom LangChain ChatModel that connects to AI Wrapper API."""
 
-    # Check status
-    print("1. Checking API status...")
-    status = client.get_status()
-    print(f"   API Status: {status['api_status']}")
-    print(f"   Active Projects: {status['context_pool']['total_contexts']}")
+        base_url: str = "http://localhost:8000"
+        project_url: Optional[str] = None
+        timeout: int = 600
+        client: Optional[AIWrapper] = None
 
-    # Example chat
-    print("\n2. Sending chat request...")
-    response = client.chat("What is Python? Jawab singkat.")
+        def __init__(self, **kwargs):
+            super().__init__(**kwargs)
+            if not self.client:
+                self.client = AIWrapper(base_url=self.base_url, timeout=self.timeout)
 
-    if response.success:
-        print(f"   Success! Project: {response.project_id}")
-        print(f"   Response: {response.response}")
-    else:
-        print(f"   Failed: {response.error}")
+        def _generate(
+            self,
+            messages: List[BaseMessage],
+            stop: Optional[List[str]] = None,
+            run_manager: Optional[Any] = None,
+            **kwargs: Any,
+        ) -> ChatResult:
+            # 1. Convert LangChain messages to a single prompt
+            prompt = ""
+            for m in messages:
+                prefix = "User: " if isinstance(m, HumanMessage) else "Assistant: "
+                prompt += f"{prefix}{m.content}\n"
 
-    # Quick chat example
-    print("\n3. Using quick_chat function...")
-    answer = quick_chat("Hello! Jawab singkat.", "http://localhost:8000")
-    print(f"   Answer: {answer}")
+            # 2. Call AI Wrapper API via unified client
+            res = self.client.chat(prompt.strip(), project_url=self.project_url)
+
+            # 3. Handle response
+            message = AIMessage(content=res.text)
+            generation = ChatGeneration(message=message)
+            return ChatResult(generations=[generation])
+
+        @property
+        def _llm_type(self) -> str:
+            return "chat-ai-wrapper"

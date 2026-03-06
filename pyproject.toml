@@ -12,6 +12,15 @@ dependencies = [
     "requests",
 ]
 
+[project.optional-dependencies]
+langchain = [
+    "langchain",
+    "langchain-core",
+    "langchain-community",
+    "langchain-classic",
+    "langchainhub",
+]
+
 [tool.setuptools.package-dir]
 "" = "."
 
