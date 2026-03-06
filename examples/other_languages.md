@@ -385,7 +385,8 @@ except Timeout:
 ### 3. Connection Pooling
 ```python
 # Reuse client instance
-client = AIClient(API_URL)  # Initialize once
+from client import AIWrapper
+client = AIWrapper(API_URL)  # Initialize once
 
 # Use multiple times
 for prompt in prompts:
@@ -404,7 +405,7 @@ if status['api_status'] != 'running':
 
 ## Next Steps
 
-1. **Python**: Use `client_library.py` (recommended)
+1. **Python**: Use `ai_wrapper_client` library (recommended)
 2. **Other Languages**: Copy & adapt examples above
 3. **Production**: Add retry logic, rate limiting, monitoring
-4. **Security**: Use HTTPS, API keys if needed
+4. **Security**: Use HTTPS (SSL), API keys if needed

@@ -4,48 +4,56 @@ Python client library untuk mengakses AI Wrapper API secara efisien. Library ini
 
 ## 🚀 Instalasi
 
-Install langsung menggunakan `pip` dari repository ini:
+Install langsung menggunakan `pip` di environment Anda:
 
 ```bash
-pip install git+https://github.com/fathindifa26/ai_wrapper_client.git
+pip install -e .
+```
+
+Jika ingin menggunakan fitur LangChain:
+```bash
+pip install ".[langchain]"
 ```
 
 ## 📖 Cara Penggunaan
 
-### 1. Inisialisasi Client
+### 1. Inisialisasi Client (Direct)
 ```python
-from client.ai_wrapper import AIClient
+from client import AIWrapper
 
 # Gunakan alamat IP VM atau server API Anda
-client = AIClient(base_url="http://[IP_VM_ANDA]:8000")
+client = AIWrapper(base_url="http://[IP_VM_ANDA]:8000")
 ```
 
-### 2. Kirim Chat (Single Project)
-Mode default menggunakan konfigurasi project utama yang ada di server.
+### 2. Kirim Chat (Standard)
 ```python
-response = client.chat("Halo, jelaskan apa itu AI secara singkat.")
+response = client.chat("Halo, siapa namamu?")
 
 if response.success:
-    print(f"AI: {response.response}")
+    print(f"AI: {response.text}")
 else:
     print(f"Error: {response.error}")
 ```
 
-### 3. Kirim Chat (Multi-Project)
-Anda bisa menentukan project URL yang berbeda untuk setiap request.
+### 3. Integrasi LangChain (Advanced)
+Gunakan `ChatAIWrapper` untuk integrasi dengan LangChain Agents atau Chains.
 ```python
-project_url = "https://imagine.wpp.ai/chat/PROJ_ID/foundational"
-response = client.chat("Apa kabar?", project_url=project_url)
+from client import ChatAIWrapper
+
+llm = ChatAIWrapper(base_url="http://localhost:8000")
+# Model ini bisa langsung dimasukkan ke AgentExecutor atau Chain
 ```
 
 ## 🛠️ Fitur Utama
-- **Lightweight**: Hanya membutuhkan library `requests`.
-- **Easy Deployment**: Tidak perlu install Playwright/Chrome di sisi client.
-- **Support Parallelism**: Mendukung akses ke banyak project sekaligus.
+- **Modular Architecture**: Kode terbagi rapi ke `models`, `core`, dan `adapters`.
+- **Gemini-Style Response**: Mendukung field `candidates` untuk kemudahan parsing tool calls.
+- **Multimedia Support**: Bisa kirim image/dokumen via base64.
+- **LangChain Native**: Terintegrasi penuh sebagai objek `BaseChatModel`.
 
 ## 📝 Troubleshooting
 - Pastikan port `8000` di server tujuan sudah dibuka.
-- Jika muncul error `NOT_LOGGED_IN`, berarti session di server perlu di-refresh oleh admin.
+- Jika Agent looping, pastikan `handle_parsing_errors=True` di AgentExecutor.
+- Gunakan `client.get_status()` untuk mengecek kesehatan engine di server.
 
 ## 🔗 Links
 - **Contoh Penggunaan Lengkap**: [examples/basic_usage.py](examples/basic_usage.py)
